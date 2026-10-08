@@ -1,17 +1,34 @@
-// Discover Docker containers
 discovery.docker "containers" {
   host = "unix:///var/run/docker.sock"
 }
 
-// Read Docker container log files
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_image"]
+    target_label  = "image"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_log_stream"]
+    target_label  = "stream"
+  }
+}
+
 loki.source.docker "containers" {
   host = "unix:///var/run/docker.sock"
 
-  targets    = discovery.docker.containers.targets
+  targets    = discovery.relabel.containers.output
   forward_to = [loki.write.local.receiver]
 }
 
-// Send logs to Loki
 loki.write "local" {
   endpoint {
     url = "http://loki:3100/loki/api/v1/push"
